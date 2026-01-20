@@ -4,10 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Mayhem - Ultra Visuals</title>
+    
+    <!-- 1. ADDING THE ICON (FAVICON) -->
+    <!-- Place an image named 'icon.png' in your GitHub folder for this to work -->
+    <link rel="icon" type="image/png" href="icon.png">
+    <!-- If you have an .ico file instead, use this: -->
+    <!-- <link rel="shortcut icon" href="favicon.ico"> -->
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Google Fonts for 3D Text Overlays -->
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Creepster&family=Goldman:wght@700&family=Orbitron:wght@900&family=Press+Start+2P&family=Rubik+Mono+One&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- Updated Google Fonts with even more variety -->
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Creepster&family=Goldman:wght@700&family=Orbitron:wght@900&family=Press+Start+2P&family=Rubik+Mono+One&family=Syncopate:wght@700&family=Nosifer&family=Permanent+Marker&family=Fascinate+Inline&family=Monoton&family=Shojumaru&display=swap" rel="stylesheet">
+    
     <style>
         body {
             margin: 0;
@@ -131,6 +140,11 @@
                     <option value="'Syncopate', sans-serif">Syncopate (Wide)</option>
                     <option value="'Bangers', cursive">Bangers (Comic)</option>
                     <option value="'Creepster', cursive">Creepster (Horror)</option>
+                    <option value="'Nosifer', cursive">Nosifer (Dripping)</option>
+                    <option value="'Permanent Marker', cursive">Marker</option>
+                    <option value="'Monoton', cursive">Monoton (Retro)</option>
+                    <option value="'Shojumaru', cursive">Shojumaru (Ancient)</option>
+                    <option value="'Fascinate Inline', cursive">Fascinate</option>
                     <option value="Courier New">Monospace</option>
                     <option value="Impact">Impact</option>
                 </select>
@@ -437,7 +451,6 @@
             const cctx = canvasText.getContext('2d');
             canvasText.width = 1024; canvasText.height = 256;
             cctx.fillStyle = textColorSelect.value;
-            // Increased font resolution
             cctx.font = `bold 120px ${fontSelect.value}`;
             cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
             cctx.fillText(textInput.value, 512, 128);
