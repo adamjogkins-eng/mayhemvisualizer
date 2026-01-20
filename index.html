@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Mayhem - Ultra Visuals</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts for 3D Text Overlays -->
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Creepster&family=Goldman:wght@700&family=Orbitron:wght@900&family=Press+Start+2P&family=Rubik+Mono+One&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: 'Arial Black', Gadget, sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #three-canvas {
+            display: block;
+        }
+        /* Strobe Overlays */
+        #strobe-white { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 20; mix-blend-mode: overlay; }
+        #strobe-black { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 21; }
+
+        .ui-layer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 30;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        .mayhem-btn {
+            background: #ff0055;
+            color: #fff;
+            padding: 20px 40px;
+            font-size: 1.2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: 4px solid #fff;
+            border-radius: 5px;
+            box-shadow: 8px 8px 0px #550022;
+            transition: all 0.1s;
+        }
+        .mayhem-btn:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #550022; }
+        .glitch-text { text-shadow: 2px 0 red, -2px 0 blue; animation: glitch 0.3s infinite; }
+        @keyframes glitch { 0% { transform: skew(2deg); } 50% { transform: skew(-2deg); } 100% { transform: skew(0deg); } }
+        
+        .file-input-wrapper {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px dashed #ff0055;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #visual-meter { width: 200px; height: 10px; background: #111; margin: 10px auto; border-radius: 5px; overflow: hidden; border: 1px solid #333; position: relative;}
+        #meter-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0055, #ffcc00); transition: width 0.1s ease-out; }
+        .ui-hidden { opacity: 0; pointer-events: none !important; }
+        
+        .modal {
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #ff0055;
+            padding: 15px;
+            border-radius: 8px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            display: none;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #stamp-instruction {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #ff0055;
+            font-weight: bold;
+            z-index: 50;
+            display: none;
+            pointer-events: none;
+        }
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            transition: background 0.2s;
+        }
+        .control-btn:hover { background: rgba(255, 255, 255, 0.2); }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="strobe-white"></div>
+        <div id="strobe-black"></div>
+        <div id="stamp-instruction" class="uppercase tracking-widest animate-pulse">Click anywhere to place your text!</div>
+        
+        <canvas id="three-canvas"></canvas>
+        
+        <!-- Text Editor Modal -->
+        <div id="text-editor" class="modal interactive">
+            <h3 class="text-pink-500 font-bold mb-2">ADD 3D MAYHEM TEXT</h3>
+            <input type="text" id="user-text-input" placeholder="Type message..." class="bg-black border border-gray-700 p-2 w-full mb-3 text-white outline-none focus:border-pink-500">
+            <div class="flex gap-2 mb-3">
+                <select id="font-select" class="bg-black border border-gray-700 text-xs p-1 flex-1">
+                    <option value="Arial Black">Arial Black</option>
+                    <option value="'Orbitron', sans-serif">Orbitron (Cyber)</option>
+                    <option value="'Goldman', cursive">Goldman (Tech)</option>
+                    <option value="'Press Start 2P', cursive">Retro Pixel</option>
+                    <option value="'Anton', sans-serif">Anton (Heavy)</option>
+                    <option value="'Rubik Mono One', sans-serif">Rubik Block</option>
+                    <option value="'Syncopate', sans-serif">Syncopate (Wide)</option>
+                    <option value="'Bangers', cursive">Bangers (Comic)</option>
+                    <option value="'Creepster', cursive">Creepster (Horror)</option>
+                    <option value="Courier New">Monospace</option>
+                    <option value="Impact">Impact</option>
+                </select>
+                <input type="color" id="text-color-select" value="#ffffff" class="bg-transparent border-none w-10 h-8 cursor-pointer">
+            </div>
+            <div class="flex gap-2">
+                <button id="confirm-text-btn" class="bg-pink-600 text-white text-xs px-3 py-2 rounded font-bold flex-1">READY TO PLACE</button>
+                <button id="close-editor-btn" class="bg-gray-700 text-white text-xs px-3 py-2 rounded font-bold">CANCEL</button>
+            </div>
+        </div>
+
+        <!-- Visual Settings Modal -->
+        <div id="visual-editor" class="modal interactive">
+            <h3 class="text-blue-500 font-bold mb-2 uppercase text-sm">Visual Settings</h3>
+            <div class="space-y-3 mb-4">
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase font-bold text-pink-500">🔥 EDIT MODE</span>
+                    <input type="checkbox" id="edit-mode" class="accent-pink-500 w-4 h-4">
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase">Geometry Shape</span>
+                    <select id="shape-select" class="bg-black border border-gray-700 text-xs p-1 flex-1">
+                        <option value="box">Cubes</option>
+                        <option value="mountain">Infinite Mountain</option>
+                        <option value="sphere">Spheres</option>
+                        <option value="icosahedron">Crystals</option>
+                        <option value="torusknot">Torus Knots</option>
+                        <option value="torus">Simple Rings</option>
+                    </select>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase">Earthly Visuals</span>
+                    <input type="checkbox" id="earthly-mode" class="accent-green-500 w-4 h-4">
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase">Primary Color</span>
+                    <input type="color" id="cube-color-select" value="#ff0055" class="bg-transparent border-none w-10 h-8 cursor-pointer">
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase text-pink-500 font-bold">🌈 Rainbow Mode</span>
+                    <input type="checkbox" id="rainbow-mode" class="accent-pink-500 w-4 h-4">
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs uppercase">Fog Density</span>
+                    <input type="range" id="fog-density" min="0" max="100" value="15" class="accent-pink-500 w-24">
+                </div>
+            </div>
+            <button id="close-visuals-btn" class="bg-gray-700 text-white text-xs px-3 py-2 rounded font-bold w-full">CLOSE</button>
+        </div>
+
+        <div class="ui-layer" id="ui-container">
+            <h1 class="text-6xl mb-6 font-black tracking-tighter" id="main-title">MAYHEM</h1>
+            <div id="setup-screen" class="interactive space-y-4">
+                <div class="file-input-wrapper" onclick="document.getElementById('audio-upload').click()">
+                    <p class="text-pink-400 font-bold">IMPORT MP3 OR VIDEO</p>
+                    <input type="file" id="audio-upload" accept="audio/*,video/*" class="hidden">
+                </div>
+                <button id="play-default" class="mayhem-btn">USE DEFAULT TRACK</button>
+            </div>
+
+            <div id="game-ui" class="hidden">
+                <div class="glitch-text text-4xl font-bold text-white mb-2 uppercase">Audio Visualizer</div>
+                <p class="text-xs text-pink-500 font-bold uppercase tracking-widest mb-4" id="file-name">NOW PLAYING</p>
+                
+                <div class="interactive flex items-center justify-center gap-4 mb-4">
+                    <button id="rewind-btn" class="control-btn uppercase">« 10s</button>
+                    <div id="visual-meter" class="m-0"><div id="meter-fill"></div></div>
+                    <button id="forward-btn" class="control-btn uppercase">10s »</button>
+                </div>
+
+                <div class="interactive mt-4 flex flex-col items-center gap-2">
+                    <div class="flex gap-2">
+                        <button id="add-text-btn" class="text-[10px] bg-blue-600 text-white px-4 py-1.5 rounded font-bold hover:bg-blue-500 uppercase">Text Overlay</button>
+                        <button id="open-visuals-btn" class="text-[10px] bg-purple-600 text-white px-4 py-1.5 rounded font-bold hover:bg-purple-500 uppercase">VFX Editor</button>
+                    </div>
+                    <button id="hide-ui-btn" class="text-[10px] bg-pink-600 text-white px-4 py-1.5 rounded font-bold hover:bg-pink-500 uppercase">Hide Interface</button>
+                    <button id="change-song-btn" class="text-[10px] bg-white text-black px-4 py-1.5 rounded font-bold hover:bg-gray-200 uppercase">Change Song</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- THREE.JS SETUP ---
+        const threeCanvas = document.getElementById('three-canvas');
+        const strobeWhite = document.getElementById('strobe-white');
+        const strobeBlack = document.getElementById('strobe-black');
+        const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1500);
+        camera.position.set(0, 5, 20);
+
+        let activeMeshes = [];
+        let terrainMesh = null;
+        const meshGroup = new THREE.Group();
+        scene.add(meshGroup);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+        
+        const mainLight = new THREE.PointLight(0xffffff, 3, 200);
+        mainLight.position.set(0, 20, 15);
+        scene.add(mainLight);
+
+        const visualState = {
+            primaryColor: new THREE.Color(0xff0055),
+            rainbowMode: false,
+            earthlyMode: false,
+            editMode: false,
+            shape: 'box'
+        };
+
+        const EARTH_COLORS = {
+            grass: new THREE.Color(0x3e7b27),
+            dirt: new THREE.Color(0x5d4037),
+            stone: new THREE.Color(0x757575)
+        };
+
+        const geometries = {
+            box: new THREE.BoxGeometry(1.5, 1.5, 1.5),
+            sphere: new THREE.SphereGeometry(1, 32, 32),
+            icosahedron: new THREE.IcosahedronGeometry(1.5, 0),
+            torusknot: new THREE.TorusKnotGeometry(1, 0.3, 100, 16),
+            torus: new THREE.TorusGeometry(1.2, 0.2, 16, 100),
+            mountain: new THREE.PlaneGeometry(150, 150, 40, 40)
+        };
+
+        function getEarthlyColor(i) {
+            const keys = Object.keys(EARTH_COLORS);
+            return EARTH_COLORS[keys[i % keys.length]];
+        }
+
+        function populateScene() {
+            while(meshGroup.children.length > 0){ 
+                meshGroup.remove(meshGroup.children[0]); 
+            }
+            activeMeshes = [];
+            terrainMesh = null;
+
+            if (visualState.shape === 'mountain') {
+                const geometry = geometries.mountain.clone();
+                geometry.rotateX(-Math.PI / 2);
+                const material = new THREE.MeshStandardMaterial({
+                    color: visualState.primaryColor,
+                    wireframe: !visualState.earthlyMode,
+                    metalness: visualState.earthlyMode ? 0.1 : 0.9,
+                    roughness: visualState.earthlyMode ? 0.8 : 0.1,
+                    emissive: visualState.primaryColor,
+                    emissiveIntensity: visualState.earthlyMode ? 0.05 : 0.2
+                });
+                terrainMesh = new THREE.Mesh(geometry, material);
+                terrainMesh.position.set(0, -5, -30);
+                meshGroup.add(terrainMesh);
+                for(let i=0; i<60; i++) {
+                    const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), material.clone());
+                    p.position.set((Math.random()-0.5)*150, -4.5, -20 - Math.random()*200);
+                    meshGroup.add(p);
+                    activeMeshes.push(p);
+                }
+            } else {
+                const geometry = geometries[visualState.shape];
+                for (let i = 0; i < 150; i++) {
+                    const material = new THREE.MeshStandardMaterial({ 
+                        color: visualState.primaryColor,
+                        metalness: visualState.earthlyMode ? 0.1 : 0.9,
+                        roughness: visualState.earthlyMode ? 0.9 : 0.1,
+                        emissive: visualState.primaryColor,
+                        emissiveIntensity: 0.1
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 5 + Math.random() * 40;
+                    mesh.position.x = Math.cos(angle) * radius;
+                    mesh.position.y = Math.sin(angle) * radius;
+                    mesh.position.z = Math.random() * -600;
+                    mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+                    mesh.userData = { 
+                        speed: 0.5 + Math.random() * 2, 
+                        rotSpeedX: (Math.random() - 0.5) * 0.02,
+                        rotSpeedY: (Math.random() - 0.5) * 0.02,
+                        angle: angle, 
+                        radius: radius,
+                        hueOffset: Math.random() * 0.2,
+                        currentPulse: 1
+                    };
+                    activeMeshes.push(mesh);
+                    meshGroup.add(mesh);
+                }
+            }
+        }
+        populateScene();
+
+        // --- AUDIO ENGINE ---
+        let audioCtx, analyzer, dataArray, source;
+        const audio = new Audio();
+        audio.loop = true;
+        audio.crossOrigin = "anonymous";
+        let active = false;
+        let smoothIntensity = 0;
+        
+        let runningRMS = 60; 
+        const rmsLerp = 0.005; 
+
+        // --- DOM & UI ---
+        const uiContainer = document.getElementById('ui-container');
+        const setupScreen = document.getElementById('setup-screen');
+        const gameUi = document.getElementById('game-ui');
+        const audioUpload = document.getElementById('audio-upload');
+        const playDefault = document.getElementById('play-default');
+        const changeSongBtn = document.getElementById('change-song-btn');
+        const hideUiBtn = document.getElementById('hide-ui-btn');
+        const addTextBtn = document.getElementById('add-text-btn');
+        const openVisualsBtn = document.getElementById('open-visuals-btn');
+        const meterFill = document.getElementById('meter-fill');
+        const textEditor = document.getElementById('text-editor');
+        const visualEditor = document.getElementById('visual-editor');
+        const cubeColorSelect = document.getElementById('cube-color-select');
+        const rainbowModeToggle = document.getElementById('rainbow-mode');
+        const earthlyToggle = document.getElementById('earthly-mode');
+        const editModeToggle = document.getElementById('edit-mode');
+        const shapeSelect = document.getElementById('shape-select');
+        const fogSlider = document.getElementById('fog-density');
+        const textInput = document.getElementById('user-text-input');
+        const fontSelect = document.getElementById('font-select');
+        const textColorSelect = document.getElementById('text-color-select');
+        const stampInstruction = document.getElementById('stamp-instruction');
+
+        let uiVisible = true;
+        let isStamping = false;
+        const textLabels = [];
+
+        async function initAudio(url, name) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyzer = audioCtx.createAnalyser();
+                source = audioCtx.createMediaElementSource(audio);
+                source.connect(analyzer);
+                analyzer.connect(audioCtx.destination);
+                analyzer.fftSize = 1024;
+                analyzer.smoothingTimeConstant = 0.8;
+                dataArray = new Uint8Array(analyzer.frequencyBinCount);
+            }
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+            audio.src = url;
+            document.getElementById('file-name').innerText = (name || "TRACK: DEFAULT").slice(0, 25);
+            runningRMS = 60; 
+            audio.play();
+            active = true;
+            setupScreen.classList.add('hidden');
+            gameUi.classList.remove('hidden');
+        }
+
+        audioUpload.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) initAudio(URL.createObjectURL(file), file.name.toUpperCase());
+        };
+
+        playDefault.onclick = () => initAudio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", "PHONK MAYHEM");
+
+        changeSongBtn.onclick = (e) => {
+            e.stopPropagation();
+            audio.pause();
+            active = false;
+            smoothIntensity = 0;
+            textLabels.forEach(l => scene.remove(l));
+            textLabels.length = 0;
+            setupScreen.classList.remove('hidden');
+            gameUi.classList.add('hidden');
+            showUI();
+        };
+
+        document.getElementById('rewind-btn').onclick = (e) => { e.stopPropagation(); audio.currentTime -= 10; };
+        document.getElementById('forward-btn').onclick = (e) => { e.stopPropagation(); audio.currentTime += 10; };
+        openVisualsBtn.onclick = (e) => { e.stopPropagation(); visualEditor.style.display = 'block'; };
+        document.getElementById('close-visuals-btn').onclick = () => { visualEditor.style.display = 'none'; };
+        cubeColorSelect.oninput = (e) => { visualState.primaryColor.set(e.target.value); populateScene(); };
+        rainbowModeToggle.onchange = (e) => { visualState.rainbowMode = e.target.checked; };
+        earthlyToggle.onchange = (e) => { visualState.earthlyMode = e.target.checked; populateScene(); };
+        editModeToggle.onchange = (e) => { visualState.editMode = e.target.checked; };
+        shapeSelect.onchange = (e) => { visualState.shape = e.target.value; populateScene(); };
+        fogSlider.oninput = (e) => { scene.fog.density = e.target.value / 1000; };
+        hideUiBtn.onclick = (e) => { e.stopPropagation(); uiContainer.classList.add('ui-hidden'); uiVisible = false; };
+        function showUI() { if (!isStamping && !uiVisible) { uiContainer.classList.remove('ui-hidden'); uiVisible = true; } }
+        window.addEventListener('mousemove', showUI);
+
+        addTextBtn.onclick = (e) => { e.stopPropagation(); textEditor.style.display = 'block'; };
+        document.getElementById('close-editor-btn').onclick = () => { textEditor.style.display = 'none'; };
+        document.getElementById('confirm-text-btn').onclick = () => {
+            if (!textInput.value.trim()) return;
+            textEditor.style.display = 'none';
+            isStamping = true;
+            stampInstruction.style.display = 'block';
+        };
+
+        threeCanvas.addEventListener('click', (e) => {
+            if (!isStamping) return;
+            const canvasText = document.createElement('canvas');
+            const cctx = canvasText.getContext('2d');
+            canvasText.width = 1024; canvasText.height = 256;
+            cctx.fillStyle = textColorSelect.value;
+            // Increased font resolution
+            cctx.font = `bold 120px ${fontSelect.value}`;
+            cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
+            cctx.fillText(textInput.value, 512, 128);
+            const texture = new THREE.CanvasTexture(canvasText);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            const vec = new THREE.Vector3();
+            vec.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1, 0.5);
+            vec.unproject(camera);
+            vec.sub(camera.position).normalize();
+            const distance = -camera.position.z / vec.z;
+            const pos = camera.position.clone().add(vec.multiplyScalar(distance));
+            sprite.position.copy(pos);
+            sprite.scale.set(12, 3, 1);
+            scene.add(sprite);
+            textLabels.push(sprite);
+            isStamping = false;
+            stampInstruction.style.display = 'none';
+        });
+
+        // --- ANIMATION LOOP ---
+        let time = 0;
+        const flashColor = new THREE.Color();
+        const cycleColor = new THREE.Color();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            if (active && analyzer) {
+                analyzer.getByteFrequencyData(dataArray);
+                let squareSum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    squareSum += dataArray[i] * dataArray[i];
+                }
+                const currentRMS = Math.sqrt(squareSum / dataArray.length);
+                runningRMS = THREE.MathUtils.lerp(runningRMS, Math.max(currentRMS, 20), rmsLerp);
+                let intensity = currentRMS / (runningRMS * 2.0); 
+                intensity = Math.pow(Math.min(intensity, 1), 2.5); 
+                smoothIntensity = THREE.MathUtils.lerp(smoothIntensity, intensity, 0.1);
+                meterFill.style.width = (smoothIntensity * 100) + "%";
+            }
+
+            // --- STROBE LOGIC ---
+            if (visualState.editMode && smoothIntensity > 0.85) {
+                const strobeChance = Math.random();
+                if (strobeChance > 0.95) {
+                    strobeWhite.style.opacity = smoothIntensity * 0.4;
+                    strobeBlack.style.opacity = 0;
+                } else if (strobeChance > 0.9) {
+                    strobeBlack.style.opacity = smoothIntensity * 0.5;
+                    strobeWhite.style.opacity = 0;
+                } else {
+                    strobeWhite.style.opacity = 0;
+                    strobeBlack.style.opacity = 0;
+                }
+            } else {
+                strobeWhite.style.opacity = 0;
+                strobeBlack.style.opacity = 0;
+            }
+
+            // --- AMBIENCE ---
+            if (visualState.earthlyMode) {
+                flashColor.set(EARTH_COLORS.grass).multiplyScalar(0.02 + smoothIntensity * 0.1);
+            } else if (visualState.rainbowMode) {
+                flashColor.setHSL((time * 0.05) % 1, 0.8, 0.05 * smoothIntensity);
+            } else {
+                flashColor.copy(visualState.primaryColor).multiplyScalar(0.08 * smoothIntensity);
+            }
+            renderer.setClearColor(flashColor, 1);
+            scene.fog.color.copy(flashColor);
+
+            const rainbowHue = (time * 0.1) % 1;
+
+            // --- TERRAIN ---
+            if (terrainMesh) {
+                const pos = terrainMesh.geometry.attributes.position;
+                terrainMesh.position.z += 0.3 + (smoothIntensity * 4);
+                if (terrainMesh.position.z > 30) terrainMesh.position.z = -120;
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    const z = pos.getZ(i);
+                    let h = Math.sin(x * 0.04 + time) * Math.cos(z * 0.04 + time) * 2;
+                    const binIdx = i % 64;
+                    const audioVal = dataArray ? (dataArray[binIdx] / 255) : 0;
+                    h += Math.pow(audioVal, 3) * 15 * smoothIntensity; 
+                    pos.setY(i, THREE.MathUtils.lerp(pos.getY(i), h, 0.1));
+                }
+                pos.needsUpdate = true;
+                cycleColor.copy(visualState.rainbowMode ? new THREE.Color().setHSL(rainbowHue, 0.8, 0.5) : (visualState.earthlyMode ? EARTH_COLORS.grass : visualState.primaryColor));
+                terrainMesh.material.color.copy(cycleColor);
+                terrainMesh.material.emissive.copy(cycleColor);
+                terrainMesh.material.emissiveIntensity = 0.05 + (smoothIntensity * 1.5);
+            }
+
+            // --- SHAPES ---
+            const speedFactor = (visualState.editMode ? 1.0 : 0.4) + (smoothIntensity * 10);
+            activeMeshes.forEach((mesh, i) => {
+                mesh.position.z += speedFactor * mesh.userData.speed;
+                mesh.rotation.x += mesh.userData.rotSpeedX + (smoothIntensity * 0.02);
+                mesh.rotation.y += mesh.userData.rotSpeedY + (smoothIntensity * 0.02);
+                
+                const binIdx = i % 128;
+                const audioVal = dataArray ? (dataArray[binIdx] / 255) : 0;
+                const targetScale = 1 + (Math.pow(audioVal, 3) * (visualState.editMode ? 15 : 8) * smoothIntensity);
+                mesh.scale.setScalar(THREE.MathUtils.lerp(mesh.scale.x, targetScale, 0.15));
+                
+                if (visualState.rainbowMode) cycleColor.setHSL((rainbowHue + mesh.userData.hueOffset) % 1, 0.8, 0.5);
+                else if (visualState.earthlyMode) cycleColor.copy(getEarthlyColor(i));
+                else cycleColor.copy(visualState.primaryColor);
+                
+                mesh.material.color.copy(cycleColor);
+                mesh.material.emissive.copy(cycleColor);
+                mesh.material.emissiveIntensity = 0.1 + (Math.pow(audioVal, 2) * smoothIntensity * 5);
+                if (mesh.position.z > 50) mesh.position.z = -600;
+            });
+
+            // --- CAMERA ---
+            let shakeLimit = visualState.editMode ? 4 : 1.2;
+            if (smoothIntensity > 0.7) {
+                camera.position.x = (Math.random() - 0.5) * smoothIntensity * shakeLimit;
+                camera.position.y = 5 + (Math.random() - 0.5) * smoothIntensity * shakeLimit;
+                camera.fov = 75 + (smoothIntensity * (visualState.editMode ? 40 : 15));
+            } else {
+                camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.05);
+                camera.position.y = THREE.MathUtils.lerp(camera.position.y, 5, 0.05);
+                camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.05);
+            }
+
+            renderer.toneMappingExposure = 0.8 + (smoothIntensity * (visualState.editMode ? 4 : 1.5));
+            camera.updateProjectionMatrix();
+
+            textLabels.forEach(sprite => {
+                const s = 1 + (smoothIntensity * (visualState.editMode ? 2 : 0.8));
+                sprite.scale.lerp(new THREE.Vector3(12 * s, 3 * s, 1), 0.1);
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
+
